@@ -17,7 +17,7 @@
         }
         #gameCanvas {
             border: 5px solid #ffd700;
-            background: url('SpaceBG.png') no-repeat center center fixed;
+            background: url('/SpaceBG.png') no-repeat center center fixed; /* Adjusted path */
             background-size: cover;
         }
         #leaderboard {
@@ -79,19 +79,36 @@
 
         // Load sprites
         const playerSprite = new Image();
-        playerSprite.src = "/Me.png"; // Spaceship
-
         const crystalSprite = new Image();
-        crystalSprite.src = "/crystal.png"; // Crystal
-
         const bombSprite = new Image();
-        bombSprite.src = "/bomb.png"; // Bomb
-
         const enemySprite = new Image();
-        enemySprite.src = "/enemy.png"; // Enemy ship
-
         const gateSprite = new Image();
-        gateSprite.src = "/portal.png"; // Portal
+
+        // Array of sprites to load
+        const sprites = [
+            { img: playerSprite, src: '/Me.png' },
+            { img: crystalSprite, src: '/crystal.png' },
+            { img: bombSprite, src: '/bomb.png' },
+            { img: enemySprite, src: '/enemy.png' },
+            { img: gateSprite, src: '/portal.png' }
+        ];
+
+        // Load all images and start game when ready
+        let loadedImages = 0;
+        sprites.forEach(sprite => {
+            sprite.img.src = sprite.src;
+            sprite.img.onload = () => {
+                loadedImages++;
+                console.log(`${sprite.src} loaded successfully`);
+                if (loadedImages === sprites.length) {
+                    console.log("All sprites loaded!");
+                    // Game is ready to start, but we'll wait for user input
+                }
+            };
+            sprite.img.onerror = () => {
+                console.error(`Failed to load ${sprite.src}`);
+            };
+        });
 
         // Load sounds
         const collectSound = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
@@ -134,14 +151,14 @@
             }
 
             reset() {
-                this.x = canvas.width/2;
-                this.y = canvas.height/2;
+                this.x = canvas.width / 2;
+                this.y = canvas.height / 2;
             }
         }
 
         // Initialize game
         function initGame() {
-            player = new Sprite(canvas.width/2, canvas.height/2, 40, 40, playerSprite, 5);
+            player = new Sprite(canvas.width / 2, canvas.height / 2, 40, 40, playerSprite, 5);
             spawnCrystals();
             spawnBombs();
             spawnEnemies();
@@ -155,9 +172,9 @@
             for (let i = 0; i < 5 + level; i++) {
                 let x, y;
                 do {
-                    x = Math.random() * (canvas.width - 30 - borderWidth*2 - 150) + borderWidth; // Avoid leaderboard area
-                    y = Math.random() * (canvas.height - 30 - borderWidth*2) + borderWidth;
-                } while (x + 30 > canvas.width - 160); // Ensure no overlap with leaderboard
+                    x = Math.random() * (canvas.width - 30 - borderWidth * 2 - 150) + borderWidth;
+                    y = Math.random() * (canvas.height - 30 - borderWidth * 2) + borderWidth;
+                } while (x + 30 > canvas.width - 160);
                 crystals.push(new Sprite(x, y, 30, 30, crystalSprite));
             }
         }
@@ -166,8 +183,8 @@
             bombs = [];
             for (let i = 0; i < 3 + level; i++) {
                 bombs.push(new Sprite(
-                    Math.random() * (canvas.width - 30 - borderWidth*2) + borderWidth,
-                    Math.random() * (canvas.height - 30 - borderWidth*2) + borderWidth,
+                    Math.random() * (canvas.width - 30 - borderWidth * 2) + borderWidth,
+                    Math.random() * (canvas.height - 30 - borderWidth * 2) + borderWidth,
                     30, 30, bombSprite
                 ));
             }
@@ -177,8 +194,8 @@
             enemies = [];
             for (let i = 0; i < level; i++) {
                 enemies.push(new Sprite(
-                    Math.random() * (canvas.width - 30 - borderWidth*2) + borderWidth,
-                    Math.random() * (canvas.height - 30 - borderWidth*2) + borderWidth,
+                    Math.random() * (canvas.width - 30 - borderWidth * 2) + borderWidth,
+                    Math.random() * (canvas.height - 30 - borderWidth * 2) + borderWidth,
                     35, 35, enemySprite,
                     2 + level * 0.5
                 ));
@@ -187,18 +204,18 @@
 
         function spawnGate() {
             gate = new Sprite(
-                Math.random() * (canvas.width - 60 - borderWidth*2) + borderWidth,
-                Math.random() * (canvas.height - 60 - borderWidth*2) + borderWidth,
+                Math.random() * (canvas.width - 60 - borderWidth * 2) + borderWidth,
+                Math.random() * (canvas.height - 60 - borderWidth * 2) + borderWidth,
                 60, 60, gateSprite
             );
         }
 
         // Collision detection
         function checkCollision(sprite1, sprite2) {
-            const dx = (sprite1.x + sprite1.width/2) - (sprite2.x + sprite2.width/2);
-            const dy = (sprite1.y + sprite1.height/2) - (sprite2.y + sprite2.height/2);
+            const dx = (sprite1.x + sprite1.width / 2) - (sprite2.x + sprite2.width / 2);
+            const dy = (sprite1.y + sprite1.height / 2) - (sprite2.y + sprite2.height / 2);
             const distance = Math.sqrt(dx * dx + dy * dy);
-            return distance < (sprite1.width/2 + sprite2.width/2);
+            return distance < (sprite1.width / 2 + sprite2.width / 2);
         }
 
         // Game loop
@@ -207,23 +224,17 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw player
             player.draw();
-
-            // Handle crystals
             crystals.forEach((crystal, index) => {
                 crystal.draw();
                 if (checkCollision(player, crystal)) {
                     crystals.splice(index, 1);
                     score += 10;
                     collectSound.play();
-                    if (crystals.length === 0) {
-                        spawnGate();
-                    }
+                    if (crystals.length === 0) spawnGate();
                 }
             });
 
-            // Handle bombs
             bombs.forEach(bomb => {
                 bomb.draw();
                 if (checkCollision(player, bomb)) {
@@ -234,7 +245,6 @@
                 }
             });
 
-            // Handle enemies
             enemies.forEach(enemy => {
                 enemy.draw();
                 enemy.move(
@@ -249,7 +259,6 @@
                 }
             });
 
-            // Handle gate
             if (gate) {
                 gate.draw();
                 if (checkCollision(player, gate)) {
@@ -281,20 +290,24 @@
         canvas.addEventListener('mousemove', e => {
             if (useMouse && gameRunning) {
                 const rect = canvas.getBoundingClientRect();
-                player.x = e.clientX - rect.left - player.width/2;
-                player.y = e.clientY - rect.top - player.height/2;
+                player.x = e.clientX - rect.left - player.width / 2;
+                player.y = e.clientY - rect.top - player.height / 2;
                 player.checkBoundaries();
             }
         });
 
         // Game state management
         function startGame(controlMethod) {
+            if (loadedImages !== sprites.length) {
+                alert("Sprites are still loading. Please wait a moment and try again.");
+                return;
+            }
             useMouse = controlMethod === 'mouse';
             startScreen.style.display = 'none';
             gameRunning = true;
             initGame();
             gameLoop();
-            if (!useMouse) setInterval(handleKeyboard, 1000/60);
+            if (!useMouse) setInterval(handleKeyboard, 1000 / 60);
         }
 
         function gameOver() {
