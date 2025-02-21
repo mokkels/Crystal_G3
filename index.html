@@ -238,7 +238,7 @@
             enemies.forEach(enemy => {
                 enemy.draw();
                 enemy.move(
-                     (Math.random() - 0.5) * enemy.speed,
+                    (Math.random() - 0.5) * enemy.speed,
                     (Math.random() - 0.5) * enemy.speed
                 );
                 if (checkCollision(player, enemy)) {
