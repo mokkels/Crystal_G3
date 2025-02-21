@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Crystal Quest</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+        }
+        #gameCanvas {
+            border: 5px solid #ffd700;
+            background: url('SpaceBG.png') no-repeat center center fixed;
+            background-size: cover;
+        }
+        #leaderboard {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #fff;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            width: 150px;
+        }
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            color: white;
+            border-radius: 10px;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #ffd700;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #ffeb3b;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="leaderboard">Score: 0<br>Lives: 3<br>Level: 1</div>
+        <div id="startScreen">
+            <h1>Crystal Quest</h1>
+            <p>Select Control Method:</p>
+            <button onclick="startGame('keyboard')">Keyboard (Arrows)</button>
+            <button onclick="startGame('mouse')">Mouse</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const leaderboard = document.getElementById('leaderboard');
+        const startScreen = document.getElementById('startScreen');
+
+        // Game variables
+        let player, crystals, bombs, enemies, gate, score = 0, lives = 3, level = 1;
+        let gameRunning = false, useMouse = false;
+        const borderWidth = 5;
+
+        // Load sprites
+        const playerSprite = new Image();
+        playerSprite.src = 'me.png'; // Spaceship
+
+        const crystalSprite = new Image();
+        crystalSprite.src = 'crystal.png'; // Crystal
+
+        const bombSprite = new Image();
+        bombSprite.src = 'bomb.png'; // Bomb
+
+        const enemySprite = new Image();
+        enemySprite.src = 'enemy.png'; // Enemy ship
+
+        const gateSprite = new Image();
+        gateSprite.src = 'portal.png'; // Portal
+
+        // Load sounds
+        const collectSound = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+        const explosionSound = new Audio('https://www.soundjay.com/mechanical/explosion-01.mp3');
+        const levelUpSound = new Audio('https://www.soundjay.com/buttons/beep-02.mp3');
+
+        // Sprite class
+        class Sprite {
+            constructor(x, y, width, height, sprite, speed) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.sprite = sprite;
+                this.speed = speed || 0;
+            }
+
+            draw() {
+                ctx.drawImage(this.sprite, this.x, this.y, this.width, this.height);
+            }
+
+            move(dx, dy) {
+                this.x += dx;
+                this.y += dy;
+                this.checkBoundaries();
+            }
+
+            checkBoundaries() {
+                if (this.x <= borderWidth || this.x + this.width >= canvas.width - borderWidth ||
+                    this.y <= borderWidth || this.y + this.height >= canvas.height - borderWidth) {
+                    if (this === player) {
+                        lives--;
+                        this.reset();
+                        explosionSound.play();
+                        if (lives <= 0) gameOver();
+                    }
+                }
+                this.x = Math.max(borderWidth, Math.min(canvas.width - this.width - borderWidth, this.x));
+                this.y = Math.max(borderWidth, Math.min(canvas.height - this.height - borderWidth, this.y));
+            }
+
+            reset() {
+                this.x = canvas.width/2;
+                this.y = canvas.height/2;
+            }
+        }
+
+        // Initialize game
+        function initGame() {
+            player = new Sprite(canvas.width/2, canvas.height/2, 40, 40, playerSprite, 5);
+            spawnCrystals();
+            spawnBombs();
+            spawnEnemies();
+            gate = null;
+            updateLeaderboard();
+        }
+
+        // Spawn functions
+        function spawnCrystals() {
+            crystals = [];
+            for (let i = 0; i < 5 + level; i++) {
+                let x, y;
+                do {
+                    x = Math.random() * (canvas.width - 30 - borderWidth*2 - 150) + borderWidth; // Avoid leaderboard area
+                    y = Math.random() * (canvas.height - 30 - borderWidth*2) + borderWidth;
+                } while (x + 30 > canvas.width - 160); // Ensure no overlap with leaderboard
+                crystals.push(new Sprite(x, y, 30, 30, crystalSprite));
+            }
+        }
+
+        function spawnBombs() {
+            bombs = [];
+            for (let i = 0; i < 3 + level; i++) {
+                bombs.push(new Sprite(
+                    Math.random() * (canvas.width - 30 - borderWidth*2) + borderWidth,
+                    Math.random() * (canvas.height - 30 - borderWidth*2) + borderWidth,
+                    30, 30, bombSprite
+                ));
+            }
+        }
+
+        function spawnEnemies() {
+            enemies = [];
+            for (let i = 0; i < level; i++) {
+                enemies.push(new Sprite(
+                    Math.random() * (canvas.width - 30 - borderWidth*2) + borderWidth,
+                    Math.random() * (canvas.height - 30 - borderWidth*2) + borderWidth,
+                    35, 35, enemySprite,
+                    2 + level * 0.5
+                ));
+            }
+        }
+
+        function spawnGate() {
+            gate = new Sprite(
+                Math.random() * (canvas.width - 60 - borderWidth*2) + borderWidth,
+                Math.random() * (canvas.height - 60 - borderWidth*2) + borderWidth,
+                60, 60, gateSprite
+            );
+        }
+
+        // Collision detection
+        function checkCollision(sprite1, sprite2) {
+            const dx = (sprite1.x + sprite1.width/2) - (sprite2.x + sprite2.width/2);
+            const dy = (sprite1.y + sprite1.height/2) - (sprite2.y + sprite2.height/2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance < (sprite1.width/2 + sprite2.width/2);
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw player
+            player.draw();
+
+            // Handle crystals
+            crystals.forEach((crystal, index) => {
+                crystal.draw();
+                if (checkCollision(player, crystal)) {
+                    crystals.splice(index, 1);
+                    score += 10;
+                    collectSound.play();
+                    if (crystals.length === 0) {
+                        spawnGate();
+                    }
+                }
+            });
+
+            // Handle bombs
+            bombs.forEach(bomb => {
+                bomb.draw();
+                if (checkCollision(player, bomb)) {
+                    lives--;
+                    player.reset();
+                    explosionSound.play();
+                    if (lives <= 0) gameOver();
+                }
+            });
+
+            // Handle enemies
+            enemies.forEach(enemy => {
+                enemy.draw();
+                enemy.move(
+                     (Math.random() - 0.5) * enemy.speed,
+                    (Math.random() - 0.5) * enemy.speed
+                );
+                if (checkCollision(player, enemy)) {
+                    lives--;
+                    player.reset();
+                    explosionSound.play();
+                    if (lives <= 0) gameOver();
+                }
+            });
+
+            // Handle gate
+            if (gate) {
+                gate.draw();
+                if (checkCollision(player, gate)) {
+                    level++;
+                    levelUpSound.play();
+                    spawnCrystals();
+                    spawnBombs();
+                    spawnEnemies();
+                    gate = null;
+                }
+            }
+
+            updateLeaderboard();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Player controls
+        const keys = {};
+        document.addEventListener('keydown', e => keys[e.key] = true);
+        document.addEventListener('keyup', e => keys[e.key] = false);
+
+        function handleKeyboard() {
+            if (keys['ArrowUp']) player.move(0, -player.speed);
+            if (keys['ArrowDown']) player.move(0, player.speed);
+            if (keys['ArrowLeft']) player.move(-player.speed, 0);
+            if (keys['ArrowRight']) player.move(player.speed, 0);
+        }
+
+        canvas.addEventListener('mousemove', e => {
+            if (useMouse && gameRunning) {
+                const rect = canvas.getBoundingClientRect();
+                player.x = e.clientX - rect.left - player.width/2;
+                player.y = e.clientY - rect.top - player.height/2;
+                player.checkBoundaries();
+            }
+        });
+
+        // Game state management
+        function startGame(controlMethod) {
+            useMouse = controlMethod === 'mouse';
+            startScreen.style.display = 'none';
+            gameRunning = true;
+            initGame();
+            gameLoop();
+            if (!useMouse) setInterval(handleKeyboard, 1000/60);
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            startScreen.innerHTML = `<h1>Game Over</h1><p>Score: ${score}</p><button onclick="location.reload()">Restart</button>`;
+            startScreen.style.display = 'block';
+            explosionSound.play();
+        }
+
+        function updateLeaderboard() {
+            leaderboard.innerHTML = `Score: ${score}<br>Lives: ${lives}<br>Level: ${level}`;
+        }
+    </script>
+</body>
+</html>
